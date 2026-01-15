@@ -13,12 +13,14 @@ Framework de alto rendimiento para el procesamiento de señales magnetotelúrica
 
 - **Análisis Geofísico:** Cálculo de impedancia de Cagniard y estimación de resistividad aparente para exploración del subsuelo.
 
+- **Visualización 3D Avanzada:** Integración con PyVista para análisis volumétrico e interactivo del subsuelo.
+
 ## Estructura del Proyecto
 - **src/cpp/:** Código fuente en C++ (filtros, stacking y carga binaria).
 
 - **src/processing/:** Bridge de comunicación (ctypes) y motores de cálculo geofísico.
 
-- **src/visualization/:** Módulos de visualización especializada (Wiggle plots y curvas de sondeo).
+- **src/visualization/:** Módulos de visualización 2D (Matplotlib) y 3D (PyVista).
 
 - **data/raw/:** Repositorio de datos binarios de alta tasa de muestreo.
 
@@ -49,12 +51,16 @@ El procesador principal ejecuta el siguiente pipeline:
 
 5. Generación de curvas de resistividad aparente vs frecuencia.
 
+6. Visualización: Generación de pseudo-secciones 2D y modelos volumétricos 3D.
+
 ## Resultados de Rendimiento
 El framework es capaz de procesar un levantamiento completo de 24 canales en tiempo récord:
 
 - Tiempo de carga: ~0.007s
 
-- Tiempo total de procesamiento (24 canales): < 0.5s
+- Procesamiento de señales (Filtrado + Stacking): ~0.4s
+
+- Interpolación de alta resolución: < 0.01s
 
 ## Visualización de Resultados
 
@@ -69,3 +75,10 @@ Muestra las señales de los 24 canales tras la limpieza multietapa (Filtrado Not
 Resultado final que muestra la Resistividad Aparente frente a la Frecuencia. Esta curva es la base para la interpretación geológica, donde las altas frecuencias representan capas superficiales y las bajas frecuencias penetran a mayor profundidad.
 
 ![Imagen 2](assets/image2.png)
+
+### 3. Análisis Volumétrico y Slicing 3D (PyVista)
+La integración con PyVista permite realizar cortes dinámicos (Slicing) en el volumen de resistividad interpolado, facilitando la identificación de anomalías conductoras y cuerpos mineralizados.
+
+![alt text](assets/image3.png)
+
+![alt text](assets/image4.png)

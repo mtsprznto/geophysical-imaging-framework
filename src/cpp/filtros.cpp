@@ -153,4 +153,42 @@ extern "C"
             output[i] /= n_segments;
         }
     }
+
+
+    // Interpolación bilineal de resistividad en una malla 2D
+    void c_interpolate_resistivity(
+        float* input_rho, int in_rows, int in_cols,
+        float* output_rho, int out_rows, int out_cols) 
+    {
+        // Paralelismo con OpenMP para procesar la nueva malla ultra rápido
+        #pragma omp parallel for collapse(2)
+        for (int i = 0; i < out_rows; ++i) {
+            for (int j = 0; j < out_cols; ++j) {
+                // Mapeo de coordenadas de la malla nueva a la original
+                float r = (float)i * (in_rows - 1) / (out_rows - 1);
+                float c = (float)j * (in_cols - 1) / (out_cols - 1);
+
+                int i0 = (int)r;
+                int i1 = (i0 < in_rows - 1) ? i0 + 1 : i0;
+                int j0 = (int)c;
+                int j1 = (j0 < in_cols - 1) ? j0 + 1 : j0;
+
+                float dr = r - i0;
+                float dc = c - j0;
+
+                // Interpolación Bilineal
+                float v1 = input_rho[i0 * in_cols + j0];
+                float v2 = input_rho[i1 * in_cols + j0];
+                float v3 = input_rho[i0 * in_cols + j1];
+                float v4 = input_rho[i1 * in_cols + j1];
+
+                output_rho[i * out_cols + j] = 
+                    v1 * (1 - dr) * (1 - dc) +
+                    v2 * dr * (1 - dc) +
+                    v3 * (1 - dr) * dc +
+                    v4 * dr * dc;
+            }
+        }
+    }
+
 }

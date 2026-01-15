@@ -219,6 +219,3 @@ def plot_stacking_comparison(t, individual_segment, stacked_signal, n_segments):
     
     return plt.gcf()
 
-
-
-

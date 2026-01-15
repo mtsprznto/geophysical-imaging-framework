@@ -3,6 +3,7 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 from src.processing.cpp_bridge import (
+    c_interpolate_data,
     c_load_raw_data, 
     c_apply_multichannel_filter, 
     c_compute_stacking, 
@@ -11,6 +12,8 @@ from src.processing.cpp_bridge import (
 from src.processing.geophysics import compute_apparent_resistivity
 from src.visualization.plots import plot_multichannel_wiggle, plot_sounding_curve
 from scipy import signal
+
+from src.visualization.render_3d import render_dynamic_slicing, render_resistivity_section
 
 def run_master_workflow():
     print("==========================================================")
@@ -66,6 +69,24 @@ def run_master_workflow():
     mags = c_calculate_spectrum(stacked_data[:2], float(FS), target_freqs)
     rho = compute_apparent_resistivity(mags[0], mags[1], target_freqs)
 
+    # Suponiendo que los canales pares son E y los impares son H 
+    # o simplemente comparando cada canal contra una referencia magnética fija (CH2)
+    n_freqs = len(target_freqs)
+    rho_matrix = np.zeros((N_CHANNELS, n_freqs), dtype=np.float32)
+    
+    # Calculamos espectros para todos los canales de una vez
+    all_mags = c_calculate_spectrum(stacked_data, float(FS), target_freqs)
+    
+    # Referencia magnética (CH2) para todos los cálculos
+    mag_H_ref = all_mags[1] 
+    
+    for ch in range(N_CHANNELS):
+        rho_matrix[ch] = compute_apparent_resistivity(all_mags[ch], mag_H_ref, target_freqs)
+
+
+    
+
+
     # 5. GENERACIÓN DE REPORTES (Visualization Engine)
     print("[*] Generando visualizaciones finales...")
     
@@ -77,6 +98,25 @@ def run_master_workflow():
     plot_sounding_curve(target_freqs, rho, 
                         title="Resultado Final: Curva de Sondeo Magnetotelúrico")
 
+    # NUEVO Reporte 3: Visualización 3D con PyVista
+
+    # NUEVO: Interpolación de Alta Resolución (de 24x20 a 200x100 puntos)
+    print("[*] Suavizando malla mediante Interpolación Bilineal en C++...")
+    high_res_shape = (200, 100)
+    rho_smooth = c_interpolate_data(rho_matrix, high_res_shape)
+    
+    # Re-generamos frecuencias para la malla suavizada
+    freqs_smooth = np.logspace(np.log10(target_freqs[0]), np.log10(target_freqs[-1]), high_res_shape[1])
+
+    # Reporte 3: Sección Suavizada
+    print("[*] Renderizando sección de alta resolución...")
+    render_resistivity_section(freqs_smooth, rho_smooth)
+
+    # Reporte 4: Slicing Dinámico
+    print("[*] Iniciando herramienta de Slicing Dinámico...")
+    render_dynamic_slicing(freqs_smooth, rho_smooth)
+
+    
     print("\n==========================================================")
     print(f"   PROCESAMIENTO FINALIZADO EXITOSAMENTE")
     print(f"   Tiempo total: {time.perf_counter() - start_time:.4f}s")

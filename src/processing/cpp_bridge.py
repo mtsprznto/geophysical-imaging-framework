@@ -1,8 +1,10 @@
 # src\processing\cpp_bridge.py
 import ctypes
+from ctypes import POINTER, c_float, c_int, c_char_p
 import sys
 import numpy as np
 import os
+
 
 # Localizar la DLL
 # 1. Localizar rutas
@@ -75,6 +77,18 @@ try:
         ctypes.c_int                    # segment_size
     ]
     lib.compute_stacking.restype = None
+
+    #--------------------------------------------------
+    lib.c_interpolate_resistivity.argtypes = [
+        POINTER(c_float), # input_rho
+        c_int,            # in_rows
+        c_int,            # in_cols
+        POINTER(c_float), # output_rho
+        c_int,            # out_rows
+        c_int             # out_cols
+    ]
+    lib.c_interpolate_resistivity.restype = None
+    #--------------------------------------------------
 
 except OSError as e:
     print(f"Error: No se pudo cargar la librería en {lib_path}. ¿Ejecutaste la compilación?")
@@ -161,5 +175,21 @@ def c_compute_stacking(data_segments):
     )
     return output
 
+
+def c_interpolate_data(rho_matrix, new_shape):
+    in_rows, in_cols = rho_matrix.shape
+    out_rows, out_cols = new_shape
+    
+    # Usamos c_float y POINTER importados arriba
+    input_ptr = rho_matrix.astype(np.float32).ctypes.data_as(POINTER(c_float))
+    output_rho = np.zeros(new_shape, dtype=np.float32)
+    output_ptr = output_rho.ctypes.data_as(POINTER(c_float))
+    
+    # CAMBIO: Usamos 'lib' (definida arriba) no '_lib'
+    lib.c_interpolate_resistivity(
+        input_ptr, in_rows, in_cols,
+        output_ptr, out_rows, out_cols
+    )
+    return output_rho
 
 
