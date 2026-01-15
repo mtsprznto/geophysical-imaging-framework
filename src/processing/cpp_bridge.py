@@ -1,3 +1,4 @@
+# src\processing\cpp_bridge.py
 import ctypes
 import sys
 import numpy as np
@@ -25,6 +26,7 @@ try:
     
     lib = ctypes.CDLL(lib_path)
     
+    #--------------------------------------------------
     # Configurar apply_sos_filter_work
     # Argumentos: x (float*), y (float*), n_samples (int), n_sections (int), sos (float*), zi (float*)
     lib.apply_sos_filter_work.argtypes = [
@@ -36,13 +38,43 @@ try:
         ctypes.POINTER(ctypes.c_float)  # zi
     ]
     lib.apply_sos_filter_work.restype = None
-
+    #--------------------------------------------------
     lib.load_binary_data.argtypes = [
         ctypes.c_char_p,                # filename
         ctypes.POINTER(ctypes.c_float), # buffer
         ctypes.c_int                    # n_samples
     ]
     lib.load_binary_data.restype = ctypes.c_int
+    #--------------------------------------------------
+    lib.apply_sos_filter_multichannel.argtypes = [
+        ctypes.POINTER(ctypes.c_float), # input
+        ctypes.POINTER(ctypes.c_float), # output
+        ctypes.c_int,                   # n_channels
+        ctypes.c_int,                   # n_samples
+        ctypes.c_int,                   # n_sections
+        ctypes.POINTER(ctypes.c_float), # sos
+        ctypes.POINTER(ctypes.c_float)  # zi
+    ]
+    lib.apply_sos_filter_multichannel.restype = None
+    #--------------------------------------------------
+    lib.calculate_magnitude_spectrum.argtypes = [
+        ctypes.POINTER(ctypes.c_float), # input
+        ctypes.POINTER(ctypes.c_float), # output_mag
+        ctypes.c_int,                   # n_channels
+        ctypes.c_int,                   # n_samples
+        ctypes.c_float,                 # fs
+        ctypes.POINTER(ctypes.c_float), # target_freqs
+        ctypes.c_int                    # n_freqs
+    ]
+    lib.calculate_magnitude_spectrum.restype = None
+    #--------------------------------------------------
+    lib.compute_stacking.argtypes = [
+        ctypes.POINTER(ctypes.c_float), # data
+        ctypes.POINTER(ctypes.c_float), # output
+        ctypes.c_int,                   # n_segments
+        ctypes.c_int                    # segment_size
+    ]
+    lib.compute_stacking.restype = None
 
 except OSError as e:
     print(f"Error: No se pudo cargar la librería en {lib_path}. ¿Ejecutaste la compilación?")
@@ -86,3 +118,48 @@ def c_load_raw_data(filename, n_samples):
         raise Exception(f"Error al leer el archivo. Código: {result}")
         
     return output[:result] # Retorna solo lo leído
+
+def c_apply_multichannel_filter(data_matrix, sos_coeffs, zi_matrix):
+    n_ch, n_samples = data_matrix.shape
+    n_sections = len(sos_coeffs) // 6
+    output = np.zeros_like(data_matrix, dtype=np.float32)
+    
+    lib.apply_sos_filter_multichannel(
+        data_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        output.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        n_ch, n_samples, n_sections,
+        sos_coeffs.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        zi_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    )
+    return output, zi_matrix
+
+def c_calculate_spectrum(data_matrix, fs, target_freqs):
+    n_ch, n_samples = data_matrix.shape
+    n_freqs = len(target_freqs)
+    output_mag = np.zeros((n_ch, n_freqs), dtype=np.float32)
+    
+    freqs_ptr = np.ascontiguousarray(target_freqs, dtype=np.float32).ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+    
+    lib.calculate_magnitude_spectrum(
+        data_matrix.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        output_mag.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        n_ch, n_samples, fs, freqs_ptr, n_freqs
+    )
+    return output_mag
+
+def c_compute_stacking(data_segments):
+    """
+    Recibe una matriz de (n_segments, segment_size) y devuelve el promedio.
+    """
+    n_seg, seg_size = data_segments.shape
+    output = np.zeros(seg_size, dtype=np.float32)
+    
+    lib.compute_stacking(
+        data_segments.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        output.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+        n_seg, seg_size
+    )
+    return output
+
+
+
